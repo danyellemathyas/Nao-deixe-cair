@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Não Deixe Cair! — Edição Turbo</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;background:#08091a;color:#fff}
+#game{position:relative;width:100%;height:100%;overflow:hidden;background:linear-gradient(180deg,#171c4b 0%,#0b0d24 100%)}
+#stars{position:absolute;inset:0;background-image:radial-gradient(circle,#fff 1px,transparent 1.5px);background-size:48px 48px;opacity:.2}
+#hud{position:absolute;top:10px;left:8px;right:8px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;z-index:20;text-align:center}
+.h{background:#111633cc;border:1px solid #ffffff15;border-radius:13px;padding:5px 2px}.lab{font-size:9px;opacity:.6}.val{font-size:17px;font-weight:900}
+#player{position:absolute;width:54px;height:54px;border-radius:50%;left:50%;top:58%;transform:translate(-50%,-50%);background:radial-gradient(circle at 35% 28%,#fff 0 7%,#ffe75a 8% 26%,#ff7a00 55%,#ff245e 100%);box-shadow:0 0 25px #ff5b4d;z-index:10}
+#player:before,#player:after{content:"";position:absolute;width:11px;height:7px;border-radius:50%;background:#18122b;top:22px}
+#player:before{left:11px}.player-after{}
+#player:after{left:32px}
+#mouth{position:absolute;width:19px;height:9px;border-bottom:3px solid #18122b;border-radius:50%;left:18px;top:31px}
+.obstacle{position:absolute;width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#7c4dff,#e33cff);box-shadow:0 0 18px #9b4dff;z-index:8}
+.coin{position:absolute;width:27px;height:27px;border-radius:50%;background:radial-gradient(circle,#fff48a 0 12%,#ffd22e 13% 62%,#e89b00 63%);box-shadow:0 0 16px #ffd22e;z-index:7;border:2px solid #fff0a0}
+.coin:after{content:"$";position:absolute;inset:0;text-align:center;line-height:23px;color:#a76b00;font-weight:900}
+.power{position:absolute;width:34px;height:34px;border-radius:10px;background:#35e5ff;box-shadow:0 0 22px #35e5ff;z-index:7;text-align:center;line-height:34px;font-weight:900;color:#06243b}
+#progress{position:absolute;top:68px;left:12%;right:12%;height:6px;background:#ffffff18;border-radius:9px;z-index:20;overflow:hidden}
+#bar{height:100%;width:0;background:#ffe55b;border-radius:9px}
+#message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:50;background:rgba(4,5,15,.72);backdrop-filter:blur(5px)}
+.card{width:min(92%,400px);padding:24px 20px;border-radius:28px;background:#171a3bf5;border:1px solid #ffffff18;box-shadow:0 20px 80px #0008}
+h1{font-size:36px;margin:0 0 7px;color:#ffe85c}.sub{opacity:.78;line-height:1.4}
+button{border:0;border-radius:17px;padding:13px 22px;margin:5px;font-size:16px;font-weight:900;color:#171020;background:#ffe85c;box-shadow:0 7px 18px #0006}
+.secondary{background:#63e6ff}.danger{background:#ff6b8a}
+#shop{display:none;margin-top:10px;text-align:left}.item{display:flex;justify-content:space-between;align-items:center;padding:8px;background:#0e1230;border-radius:12px;margin:5px 0;font-size:13px}
+#rank{margin-top:10px;background:#0e1230;border-radius:14px;padding:9px;text-align:left;font-size:12px}
+.rankrow{display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid #ffffff0c}
+#hint{position:absolute;bottom:16px;left:0;right:0;text-align:center;opacity:.28;font-size:11px;z-index:2}
+.shield{filter:drop-shadow(0 0 13px #55eaff)}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="stars"></div>
+<div id="hud">
+  <div class="h"><div class="lab">PONTOS</div><div class="val" id="score">0</div></div>
+  <div class="h"><div class="lab">MOEDAS</div><div class="val">🪙 <span id="coins">0</span></div></div>
+  <div class="h"><div class="lab">VIDAS</div><div class="val" id="lives">❤️❤️❤️</div></div>
+  <div class="h"><div class="lab">FASE</div><div class="val" id="level">1</div></div>
+</div>
+<div id="progress"><div id="bar"></div></div>
+<div id="player"><div id="mouth"></div></div>
+<div id="hint">TOQUE no lado esquerdo/direito para mover • pegue moedas e poderes!</div>
+<div id="message">
+  <div class="card">
+    <h1>🔥 NÃO DEIXE CAIR!</h1>
+    <p class="sub">Agora com moedas, vidas, fases, poderes, personagens, sons e ranking local.</p>
+    <button id="start">JOGAR</button>
+    <button class="secondary" id="showShop">PERSONAGENS</button>
+    <div id="shop"></div>
+    <div id="rank"></div>
+  </div>
+</div>
+</div>
+<script>
+const game=document.getElementById('game'),player=document.getElementById('player'),message=document.getElementById('message');
+const scoreEl=document.getElementById('score'),coinsEl=document.getElementById('coins'),livesEl=document.getElementById('lives'),levelEl=document.getElementById('level'),bar=document.getElementById('bar');
+let x=50,score=0,coins=Number(localStorage.getItem('ndcCoins')||0),lives=3,level=1,progress=0;
+let speed=165,spawnTimer=0,coinTimer=0,powerTimer=0,last=0,playing=false,invincible=0,slow=0,raf;
+let obstacles=[],items=[],selected=localStorage.getItem('ndcChar')||'🔥';
+
+const chars=[
+ ['🔥','Foguinho','Clássico',0],
+ ['💎','Diamante','Começa com +1 vida',30],
+ ['👽','Alien','Moedas valem +50%',60],
+ ['🐱','Gatinho','Imã de moedas',100]
+];
+
+function sound(type){
+  try{
+    const A=window.AudioContext||window.webkitAudioContext, a=new A(),o=a.createOscillator(),g=a.createGain();
+    const f={coin:660,hit:120,power:880,level:1040,start:440}[type]||500;
+    o.frequency.value=f;o.type=type==='hit'?'sawtooth':'sine';g.gain.value=.045;o.connect(g);g.connect(a.destination);o.start();
+    o.frequency.exponentialRampToValueAtTime(f*1.4,a.currentTime+.09);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.13);o.stop(a.currentTime+.14);
+  }catch(e){}
+}
+function renderRank(){
+ let r=JSON.parse(localStorage.getItem('ndcRank')||'[]');
+ r.sort((a,b)=>b.score-a.score); r=r.slice(0,5);
+ document.getElementById('rank').innerHTML='<b>🏆 RANKING LOCAL</b>'+
+ (r.length?r.map((v,i)=>`<div class="rankrow"><span>${i+1}. ${v.name}</span><b>${v.score}</b></div>`).join(''):'<div class="rankrow">Ainda não há recordes.</div>');
+}
+function renderShop(){
+ document.getElementById('shop').innerHTML=chars.map(c=>{
+  const owned=c[3]===0||Number(localStorage.getItem('char_'+c[0])||0);
+  return `<div class="item"><span style="font-size:22px">${c[0]}</span><span>${c[1]}<br><small>${c[2]}</small></span>
+  <button ${owned?'':'disabled'} onclick="choose('${c[0]}')">${selected===c[0]?'USANDO':owned?'USAR':c[3]+' 🪙'}</button></div>`
+ }).join('');
+}
+window.choose=function(c){selected=c;localStorage.setItem('ndcChar',c);renderShop();player.textContent=c==='🔥'?'':c;player.appendChild(document.getElementById('mouth'));};
+document.getElementById('showShop').onclick=()=>{let s=document.getElementById('shop');s.style.display=s.style.display==='block'?'none':'block';renderShop()};
+function reset(){
+ obstacles.forEach(o=>o.el.remove());items.forEach(o=>o.el.remove());obstacles=[];items=[];
+ score=0;lives=selected==='💎'?4:3;level=1;progress=0;speed=165;spawnTimer=.4;coinTimer=.5;powerTimer=4;invincible=0;slow=0;x=50;
+ scoreEl.textContent=0;coinsEl.textContent=coins;levelEl.textContent=1;livesEl.textContent='❤️'.repeat(lives);bar.style.width='0%';
+ player.style.left='50%';player.classList.remove('shield');player.textContent=selected;player.appendChild(document.getElementById('mouth'));
+}
+function spawn(kind){
+ const el=document.createElement('div'); let ox=7+Math.random()*86,oy=-8;
+ if(kind==='coin'){el.className='coin'} else if(kind==='power'){el.className='power';el.textContent=Math.random()<.5?'⚡':'🛡️'} else el.className='obstacle';
+ el.style.left=ox+'%';el.style.top=oy+'%';game.appendChild(el);items.push({el,x:ox,y:oy,kind});
+}
+function rectHit(a,b){let ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();return !(ar.right<br.left||ar.left>br.right||ar.bottom<br.top||ar.top>br.bottom)}
+function loseLife(){
+ if(invincible>0)return;
+ lives--;livesEl.textContent='❤️'.repeat(Math.max(0,lives));sound('hit');
+ if(lives<=0)return end();
+ invincible=1.3;player.style.opacity=.35;setTimeout(()=>player.style.opacity=1,1300);
+}
+function end(){
+ playing=false;cancelAnimationFrame(raf);
+ const pts=Math.floor(score);let r=JSON.parse(localStorage.getItem('ndcRank')||'[]');
+ r.push({name:'Você',score:pts});r.sort((a,b)=>b.score-a.score);localStorage.setItem('ndcRank',JSON.stringify(r.slice(0,10)));
+ message.querySelector('h1').textContent='💥 FIM DE JOGO!';
+ message.querySelector('.sub').innerHTML=`Você fez <b>${pts} pontos</b> e pegou <b>${coins}</b> moedas!<br>Fase alcançada: <b>${level}</b>`;
+ document.getElementById('start').textContent='JOGAR DE NOVO';renderRank();message.classList.remove('hidden');
+}
+function nextLevel(){
+ level++;progress=0;speed+=35;sound('level');levelEl.textContent=level;
+ if(level%3===0){lives=Math.min(5,lives+1);livesEl.textContent='❤️'.repeat(lives)}
+}
+function loop(t){
+ if(!playing)return;const dt=Math.min((t-last)/1000,.035);last=t;
+ let factor=slow>0?.55:1;
+ score+=dt*10*level;progress+=dt*(5+level*.7);
+ if(progress>=100)nextLevel();
+ scoreEl.textContent=Math.floor(score);bar.style.width=progress+'%';speed=Math.min(620,165+level*35+score*.7);
+ spawnTimer-=dt;coinTimer-=dt;powerTimer-=dt;
+ if(spawnTimer<=0){spawn('obstacle');spawnTimer=Math.max(.26,.75-level*.025-Math.min(score/1200,.28))}
+ if(coinTimer<=0){spawn('coin');coinTimer=.65+Math.random()*.7}
+ if(powerTimer<=0){spawn('power');powerTimer=6+Math.random()*6}
+ invincible=Math.max(0,invincible-dt);slow=Math.max(0,slow-dt);
+ if(invincible===0)player.style.opacity=1;
+ [...items].forEach(o=>{
+   o.y+=speed*dt/10*factor;o.el.style.top=o.y+'%';
+   if(o.y>110){o.el.remove();items.splice(items.indexOf(o),1);return}
+   if(rectHit(player,o.el)){
+     if(o.kind==='obstacle'){o.el.remove();items.splice(items.indexOf(o),1);loseLife()}
+     else if(o.kind==='coin'){let mult=selected==='👽'?1.5:1;coins+=Math.round(mult);localStorage.setItem('ndcCoins',coins);coinsEl.textContent=coins;sound('coin');o.el.remove();items.splice(items.indexOf(o),1)}
+     else {let shield=o.el.textContent==='🛡️';if(shield){invincible=4;player.classList.add('shield')}else slow=4;sound('power');o.el.remove();items.splice(items.indexOf(o),1)}
+   }
+ });
+ raf=requestAnimationFrame(loop);
+}
+function move(px){if(!playing)return;let r=game.getBoundingClientRect();x=Math.max(5,Math.min(95,(px-r.left)/r.width*100));player.style.left=x+'%'}
+game.addEventListener('pointerdown',e=>move(e.clientX));
+game.addEventListener('pointermove',e=>{if(e.buttons)move(e.clientX)});
+document.getElementById('start').onclick=e=>{e.stopPropagation();reset();message.classList.add('hidden');playing=true;last=performance.now();raf=requestAnimationFrame(loop);sound('start')};
+renderRank();renderShop();player.textContent=selected;player.appendChild(document.getElementById('mouth'));
+</script>
+</body>
+</html>
